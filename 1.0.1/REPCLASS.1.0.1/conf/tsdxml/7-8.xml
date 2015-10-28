@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TE>
+    <CLASS name="ii">
+	<SUBCLASS name="dna transposon">
+	    <SUPERFAMILY name="hat" />
+	    <SUPERFAMILY name="p" />
+	    <SUPERFAMILY name="is1016/merlin" />
+	</SUBCLASS>
+    </CLASS>
+</TE>

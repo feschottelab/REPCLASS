@@ -1,0 +1,245 @@
+#!/usr/bin/perl
+
+#################################################################
+# REPCLASS              - repclass	                        #
+#                                                               #
+# The main repclass file				        #
+#                                                               #
+# 09/18/2005                                                    #
+# Nirmal Ranganathan                                            #
+#################################################################
+
+
+print "\n\nRunning repclass script\n\n";
+
+# Check if the user configuration file is provided
+if (!$ARGV[0]) {
+    print "Usage: repclass <user conf file>\n";
+    exit(0);
+}
+
+
+# Load the configuration files
+do "$ARGV[0]";
+
+#our $REPCLASS_CONF;
+
+do "$REPCLASS_CONF";
+
+# Initialize configuration file variables
+our $GENOME_FILE;
+our $BIOPERL;
+our $DATA;
+our $JOB_DIR;
+our $SEQUENCES;
+our $TEMPCHOICE;
+our $HOMOLOGY_TBLASTX_OUTPUT;
+our $HOMOLOGY_OUTPUT;
+our $ISENTIRE;
+our $TE_SEQUENCE;
+our $PBS_HEADER;
+our $WUBLAST_EXPORT;
+our $HOMOLOGY_TBLASTX_PARAM;
+our $SCRIPTS;
+our $BIN;
+our $REPCLASS;
+our $TSD_BLASTN_PARAM;
+our $TSD_BLASTN_OUTPUT;
+our $TSD_FLANKING;
+our $TSD_OUTPUT;
+our $GENOME_INDEX;
+our $STRUCTURAL;
+our $HELITRON;
+our $PROGRAMS;
+our $OUTPUT;
+our $TIR;
+our $TRF;
+our $TRNA;
+our $LTR;
+our $SSR;
+
+
+#$BIOPERL = "/usr/lib/bioperl-1.5.2_102";
+
+push (@INC, $BIOPERL);
+
+require Bio::SeqIO;
+require Bio::Seq;
+
+# Initialize local variables
+my ($pbs_header, $script_file, $pbs_jobid);
+my %scripts;
+
+# Load module number
+open(CHOICE, "$TEMPCHOICE") || die "\nCannot open $TEMPCHOICE: $!\n";
+my $moduleNb = <CHOICE>;
+chomp($moduleNb);
+close CHOICE;
+
+print "\nMy repclass module nb loaded: $moduleNb\n";
+
+
+# Create all the required directories
+mkdir($DATA, 0755) or die "Couldn't mkdir $DATA: $!";
+mkdir($JOB_DIR, 0755) or die "Couldn't mkdir $JOB_DIR: $!";
+mkdir($SEQUENCES, 0755) or die "Couldn't mkdir $SEQUENCES: $!";
+
+if($moduleNb =~ /(1|4|5|7)/) {
+	mkdir($HOMOLOGY_TBLASTX_OUTPUT, 0755) or die "Couldn't mkdir $HOMOLOGY_TBLASTX_OUTPUT: $!";
+	mkdir($HOMOLOGY_OUTPUT, 0755) or die "Couldn't mkdir $HOMOLOGY_OUTPUT: $!";
+}
+
+mkdir($SCRIPTS, 0755) or die "Couldn't mkdir $SCRIPTS: $!";
+
+if($moduleNb =~ /(2|3|4|5|6|7)/) {
+
+	# Make the following directories
+	# if the target genome fasta file is provided
+	if($GENOME_FILE ne "") { 
+		mkdir($TSD_BLASTN_OUTPUT, 0755) or die "Couldn't mkdir $TSD_BLASTN_OUTPUT: $!";
+		mkdir($TSD_FLANKING, 0755) or die "Couldn't mkdir $TSD_FLANKING: $!";
+	}
+	mkdir($TSD_OUTPUT, 0755) or die "Couldn't mkdir $TSD_OUTPUT: $!";
+}
+
+if($moduleNb =~ /(3|5|6|7)/) {
+	mkdir($STRUCTURAL,  0755) or die "Couldn't mkdir $STRUCTURAL:  $!";
+	mkdir($HELITRON,  0755) or die "Couldn't mkdir $HELITRON: $!";
+	mkdir($TIR, 0755) or die "Couldn't mkdir $TIR: $!";
+}
+
+mkdir($OUTPUT, 0755) or die "Couldn't mkdir $OUTPUT: $!\n";
+
+if($moduleNb =~ /(3|5|6|7)/) {
+	mkdir($TRF, 0755) or die "Couldn't mkdir $TRF $!\n";
+	mkdir($TRNA, 0755) or die "Couldn't mkdir $TRNA: $!\n";
+	mkdir($LTR, 0755) or die "Couldn't mkdir $LTR: $!\n";
+	mkdir($SSR, 0755) or die "Couldn't mkdir $SSR: $!\n";
+}
+
+# Code for Repeat Scout
+if ($ISENTIRE) {
+}
+#Split out the sequences
+else {
+    my $id;
+    my $seqio = new Bio::SeqIO(-format => 'fasta', -file => "$TE_SEQUENCE");
+    while (my $seqobj = $seqio->next_seq()) {
+	$id = $seqobj->primary_id;
+	my $seqout = new Bio::SeqIO(-format => 'fasta', -file => "> $SEQUENCES/$id");
+	$seqout->write_seq($seqobj);
+    }
+}
+
+
+# Create the pbs script files for the homology tblastx
+
+$pbs_header = $PBS_HEADER . "\nexport REPCLASS=$REPCLASS\n" . $WUBLAST_EXPORT . "\ncd $BIN\n";
+$script_file = $pbs_header;
+
+my @list = `ls $SEQUENCES`;
+my $num_elements = scalar(@list);
+my $num_free_nodes = 0;
+my @pbsnodes = `pbsnodes -a`;
+my $flag=0;
+
+#foreach  my $line (@pbsnodes) {
+#    chomp($line);
+##    print $line; print "\n";
+#    $line =~ s/^\s*//;
+#    $line =~ s/\s*\n$//;
+#                                                                                                                                         
+#    if ($flag) {
+#        if ($line =~ m/properties/) {
+#            if (!($line =~ m/properties = any/)) {
+#                $flag = 0;
+#                $num_free_nodes -= 2;
+#            }
+#        }
+#                                                                                                                                         
+#        if ($line =~  m/jobs/) {
+#            $num_free_nodes--;
+#            $flag = 0;
+#        }
+#        if ($line =~ m/node/) {
+#            $flag = 0;
+#        }
+#    }
+#    if ($line =~ m/state = free/) {
+#        $num_free_nodes += 2;
+#        $flag = 1;
+#    }
+#    print "**********************************        "; print $num_free_nodes; print "   \n\n";
+#}
+
+#print "NUMBER ELEMENTS  "; print $num_elements; print "\n\n";
+
+#if ($num_free_nodes < 10) {
+#    if ($num_elements < 5000) {
+#        $num_free_nodes = abs($num_elements/100);
+#    }
+#    else {
+#        $num_free_nodes = abs($num_elements/500);
+#    }
+#}
+
+
+#my $per_file = abs($num_elements/$num_free_nodes);
+#my $file_count = 0;
+#my $script_count = 0;
+
+#print "Creating PBS scripts and submitting jobs\n";
+
+if ($PBS) {
+    foreach my $file (@list) {
+	$script_file .= "./repmain.pl $ARGV[0] $file\n";
+	$file_count++;	
+
+	# test: print the count and the corresponding file name being processed
+	#my $fname =~ m/^[A-Za-z0-9_\/-]*\/(.+)$/;
+	#my $repname = $1;
+	print "\nFile nb $file_count, file name: $file\n";
+	
+	if ($file_count > $per_file) {	
+	    &script_create($SCRIPTS, $script_count, $script_file);
+	    $scripts{"script_$script_count"} = "$SCRIPTS/script_$script_count";
+	    $script_count++;
+	    $file_count = 0;
+	    $script_file = $pbs_header;
+	}
+    }
+    if ($file_count != 0) {
+    	&script_create($SCRIPTS, $script_count, $script_file);
+   	 $scripts{"script_$script_count"} = "$SCRIPTS/script_$script_count";
+    }
+
+    foreach my $scfile (keys %scripts) {
+	$pbs_jobid = `qsub $scripts{$scfile}`;
+	print "$scripts{$scfile}\n";
+    }
+}
+else {
+    foreach my $file (@list) {
+        $script_file  .= "./repmain.pl $ARGV[0] $file\n";
+    }   
+	&script_create($SCRIPTS, "sys", $script_file);	
+    	system "$SCRIPTS/script_sys";
+}
+
+
+#print "Run qstat to check the status of your jobs\n";
+
+# SUB ROUTINES 
+################################################################################
+# Create the PBS scripts file
+sub script_create() {
+    my ($script_dir, $scount, $script) = @_;
+    
+    open(SCRIPTFILE, "> $script_dir/script_$scount") or die "Cannot open file\n";
+    print SCRIPTFILE $script;
+    close(SCRIPTFILE);
+    @cannot = grep {not chmod 0755, $_} "$script_dir/script_$scount";
+    die "$0: Couldn't chmod @cannot\n" if @cannot;
+}
+###############################################################################
+

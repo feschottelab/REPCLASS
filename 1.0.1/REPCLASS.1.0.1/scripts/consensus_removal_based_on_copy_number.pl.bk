@@ -1,0 +1,208 @@
+#!/usr/bin/perl
+
+use POSIX;
+
+$filename0 = $ARGV[0];
+$filename1 = $ARGV[1];
+$filename2 = $ARGV[2];
+$ucnt = $ARGV[3];
+$matchlength = $ARGV[4];
+$matchaccuracy = $ARGV[5];
+$bucket = $ARGV[6];
+
+#open(DAT,"/home/umesh/xzykeswani/repclass/human_complete/blast.100.0.out") || die("Could not open the file!");
+open(DAT,"$filename0") || die("Could not open the file!");
+
+$copynumber = 0;
+$lookforseqlength = 0;
+$first = 1;
+@distribution = ();
+#$bucket = 10;
+$count = 0;
+@BadRepeats = ();
+$BadOnes = 0;
+
+while (<DAT>)
+{
+    $line = $_;
+    chomp($line);
+    if (index($line,"Query=",0) ne -1)
+    {
+	#print $line; print "\n";
+	
+	if ($first == 1)
+        {
+            @repeatnumber = split("=  ",$line);
+	    $lookforseqlength = 1;
+	    $lookforFirstMatch = 1;
+        }
+        else
+        {
+	    $count += 1;
+	    print $repeatnumber[1]; print "  ";
+            print $copynumber;      print "  ";
+	    print $firstmatch;      print "  ";
+	    if ($copynumber <= $ucnt)
+	    {
+		$BadOnes += 1;
+		$repeatnumber[1] =~ s/^\s+//;
+		$repeatnumber[1] =~ s/\s+$//;
+		push(@BadRepeats,$repeatnumber[1]);
+	    }
+	    $index = ceil($copynumber/$bucket);
+	    print "$index";  print "\n";
+	    $distribution[$index] += 1; 
+            $copynumber = 0;
+            @repeatnumber = split("=  ",$line);
+            $lookforseqlength = 1;
+	    $lookforFirstMatch = 1;
+        }
+	next;
+    }
+    elsif ($lookforseqlength == 1)
+    {
+	#print "X"; print "\n";
+	@split = split(/\(/,$line);
+        @length = split(" ",$split[1]);
+        $lookforseqlength = 0;
+        $seqString = $length[0];
+	#print $seqString; print "\n";
+	
+	if ($first == 0)
+	{
+	    $minScore = (($seqString * 0.5)-($seqString * 0.20)) * 1.94;
+            $minEvalue = ($seqString * $DBLength)/(2**$minScore);
+            #print $minEvalue; print "\n";
+	}
+	
+	$first = 0;
+	next;
+    }
+     elsif($lookforFirstMatch == 1)
+     {
+        if(index($line,">",0) ne -1)
+        {
+            @split = split(/>/,$line);
+            $firstmatch = $split[1];
+            $lookforFirstMatch = 0;
+        }
+    }
+    elsif(index($line,"Identities = ",0) ne -1)
+    {
+        #print $line; print "\n";
+        @split = split(/Identities = /,$line);
+        @length = split("/",$split[1]);
+        @num = split(/\(/,$length[1]);
+        #print $num[0]; print"\n";
+        #print $length[0]; print"\n";
+        #print $num[0]/$seqString; print "\n";
+        #print $length[0]/$num[0]; print "\n";
+        if((($num[0]/$seqString)>$matchlength) && (($length[0]/$num[0])>$matchaccuracy))
+        {
+            $copynumber+=1;
+        } 
+        #print $copynumber; print "\n";
+    }
+
+}
+
+close(DAT);
+
+$count += 1;
+print $repeatnumber[1]; print "  ";
+print $copynumber;      print "  ";
+print $firstmatch;      print "  ";
+
+if ($copynumber <= $ucnt)
+{
+    $BadOnes += 1;
+    $repeatnumber[1] =~ s/^\s+//;
+    $repeatnumber[1] =~ s/\s+$//;
+    push(@BadRepeats,$repeatnumber[1]);
+}
+$index = ceil($copynumber/$bucket);
+print "$index";  print "\n";
+$distribution[$index] += 1;
+
+print "\n\n\n\n";
+
+for ($i = 0; $i < @distribution; $i = $i + 1)
+{
+    print $i;
+    print "  ";
+    print $distribution[$i];
+    print "\n";
+}
+
+
+print "\n\n\n";
+print "Count = "; print $count;
+print "\n";
+print "Number of Bad Repeats is: "; print @BadRepeats;
+print "\n";
+
+for($i = 0; $i < @BadRepeats; $i += 1)
+{
+    print $BadRepeats[$i];
+    print "\n";
+}
+
+
+if (@BadRepeats > null)
+{
+    #open(DAT,"/home/umesh/xzykeswani/repclass/human_complete/HomoSapiens_chrX.100.0.ref") || die("Could not open the file!");
+    open(DAT,"$filename1") || die("Could not open the file!");
+    @orig_data = <DAT>;
+    close(DAT);
+
+    #open (COLLATE, ">>/home/umesh/xzykeswani/repclass/human_complete/HomoSapiens_chrX.100.15.ref") or die "Cannot open file!\n";
+    open(COLLATE,">>$filename2") || die("Could not open the file!");
+    $count = 0;
+    $ripoff = 0;
+    $totalcount = $BadOnes;
+    $skip = 0;
+
+    foreach $line (@orig_data){
+	#print $line; print "\n";                                                                                                                                                     
+	if (index($line,">",0) ne -1)
+	{
+	    print "Skip is: "; print $skip; print "\n";
+	    print "Bad Repeat is: "; print "\n"; 
+	    print $BadRepeats[count]; print "\n";
+	    print "Line is: "; print $line; print "\n";
+	    if (!$skip && $line =~ m/$BadRepeats[$count]/)
+	    {
+		print $BadRepeats[$count];
+		print "\n";
+		$ripoff = 1;
+		$count++;
+                if ($count == ($totalcount))
+                {
+                    $skip = 1;
+                }
+	    }
+	    else
+	    {
+		if ($ripoff == 1)
+		{
+		    $ripoff = 0;
+		}
+
+		print COLLATE $line;
+	    }
+	}
+	else
+	{
+	    if ($ripoff == 0)
+	    {
+		print COLLATE $line;
+	    }
+	}
+    }
+    close(COLLATE);
+}
+else
+{
+    print " No Bad Repeats!!\n\n";
+}
+#close(COLLATE);

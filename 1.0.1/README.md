@@ -5,7 +5,7 @@ More information can be found here:
 http://gbe.oxfordjournals.org/cgi/pmidlookup?view=long&pmid=20333191
 
 
-Please open a ticket or email 4urelie.k (at) gmail (dot) com for questions
+Please open use the "Issues" tab on the right or email 4urelie.k (at) gmail (dot) com for questions
 
 
 Some notes to run it:
